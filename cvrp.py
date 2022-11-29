@@ -49,61 +49,111 @@ class DataModel:
         # Distance Matrix
         # 136x136 Matrix - Distances stored as Meters
         self._distances = json.load(open(os.path.abspath("./distances_matrix.json"), "r"))
-        self._distances = [[0, 400, 300, 300], [400,0, 700, 700], [300, 700, 0, 0], [300, 700, 0, 0]]
         #Travel Times Matrix
         # 136x136 Matrix - Time travelled stored as Seconds
         self._travel_times = json.load(open(os.path.abspath("./travel_times_matrix.json"), "r"))
-        self._travel_times = [[0, 4, 3, 3], [4, 0, 7, 7], [3, 7, 0, 0], [3, 7, 0, 0]]
+            
         #Demands
         #Dict containing node i and n_th constraints representing times it in a month
         self._demands = parse_demands()
-        self._demands = [4, 4, 4, 6]
-data = DataModel()
-m = gp.Model()
-num_of_nodes = 4
-Q = 9
-# for i in range(3):
-#     monthly_demands = len(data._demands[i])
-#     num_of_nodes += monthly_demands
+        self._demands = [0, 4, 4, 6]
 
-x = m.addMVar((num_of_nodes, num_of_nodes), vtype=GRB.INTEGER, lb=0, name="x")
-K = m.addVar(vtype=GRB.INTEGER, lb=0, name="K")
-u = m.addVars(num_of_nodes, vtype=GRB.INTEGER, lb = 0, name="u")
+    def _set_travel_matrix(self, travel_time_matrix):
+        self._travel_times = travel_time_matrix
+        
+def run(data):
+    # data = DataModel()
+    m = gp.Model()
+    num_of_nodes = 4
+    Q = 8
+    # for i in range(3):
+    #     monthly_demands = len(data._demands[i])
+    #     num_of_nodes += monthly_demands
 
-for i in range(num_of_nodes):
+    x = m.addMVar((num_of_nodes, num_of_nodes), vtype=GRB.INTEGER, lb=0, name="x")
+    K = m.addVar(vtype=GRB.INTEGER, lb=0, name="K")
+    u = m.addVars(num_of_nodes, vtype=GRB.INTEGER, lb = 0, name="u")
+
     cur_sum = 0
-    for j in range(num_of_nodes):
-        cur_sum += x[i, j]
-    m.addConstr(cur_sum == 1)
+    for j in range(1, num_of_nodes):
+        cur_sum += x[0, j]
 
-for i in range(num_of_nodes):
-    cur_sum = 0
-    for j in range(num_of_nodes):
-        cur_sum += x[j, i]
-    m.addConstr(cur_sum == 1)
+    m.addConstr(cur_sum == K)
 
-cur_sum = 0
-for j in range(num_of_nodes):
-    cur_sum += x[0, j]
+    for i in range(1, num_of_nodes):
+        cur_sum_enters = 0
+        m.addConstr(x[i,i] == 0)
+        for j in range(num_of_nodes):
+            if i == j or data._distances[i][j] == 0: 
+                continue
+            cur_sum_enters += x[i, j]
+        m.addConstr(cur_sum_enters == 1)
 
-m.addConstr(cur_sum == K)
+    for j in range(1, num_of_nodes):
+        cur_sum = 0
+        for i in range(num_of_nodes):
+            if i == j or data._distances[i][j] == 0: continue
+            cur_sum += x[i, j]
+        m.addConstr(cur_sum == 1)
 
-for i in range(num_of_nodes):
-    for j in range(num_of_nodes):
-        m.addConstr(u[i] - u[j] + Q * x[i,j] <= Q - data._demands[j])
+    for i in range(1, num_of_nodes):
+        for j in range(1, num_of_nodes):
+            if i == j: continue
+            m.addConstr(u[i] - u[j] + Q * x[i,j] <= Q - data._demands[j])
 
-for i in range(num_of_nodes):
-    m.addConstr(data._demands[i] <= u[i])
-    m.addConstr(u[i] <= Q)
+    for i in range(1, num_of_nodes):
+        m.addConstr(data._demands[i] <= u[i])
+        m.addConstr(u[i] <= Q)
 
-# for i in range(num_of_nodes):
-#     for j in range(num_of_nodes):
-#         m.addConstr(data._distances[i][j] * x[i,j] >= 0)
+    # for i in range(num_of_nodes):
+    #     for j in range(num_of_nodes):
+    #         m.addConstr((x[i,j] == 0) >> data._distances[i][j] * x[i,j] >= 0)
 
-cumul_sum = 0
-for i in range(num_of_nodes):
-    for j in range(num_of_nodes):
-        cumul_sum += data._travel_times[i][j] * x[i,j]
+    cumul_sum = 0
+    for i in range(num_of_nodes):
+        for j in range(num_of_nodes):
+            cumul_sum += data._travel_times[i][j] * x[i,j]
 
-m.setObjective(cumul_sum, GRB.MINIMIZE)
-m.optimize()
+    m.setObjective(cumul_sum, GRB.MINIMIZE)
+    m.optimize()
+
+    for v in m.getVars():
+        if (v.varName.find('x') != -1) and v.x == 1:
+            idx = v.varName.find("[") + 1
+            end_idx = len(v.varName) - 1
+            num = v.varName[idx:end_idx]
+            i_row = int(num) // num_of_nodes
+            j_row = int(num) % num_of_nodes
+            print(f"x({i_row}, {j_row})", 1)
+        if (v.varName.find('K') != -1):
+            print(v.varName, "=", v.x)
+        
+if __name__ == "__main__":
+    print("BEGIN TESTS =>")
+    # Test Case 1
+    data = DataModel()
+    # Depot on the Side
+    travel_times = [[0, 4, 7, 7], [4, 0, 3, 3], [7, 3, 0, 0], [7, 3, 0, 0]]
+    data._set_travel_matrix(travel_times)
+    run(data)
+
+    print("++++++++++++++++++++++++++++++++++++++++++++++++++++++++++")
+    # Test Case 2
+    # Depot in the middle
+    travel_times = [[0, 4, 3, 3], [4, 0, 7, 7], [3, 7, 0, 0], [3, 7, 0, 0]]
+    data._set_travel_matrix(travel_times)
+    run(data)
+
+    print("++++++++++++++++++++++++++++++++++++++++++++++++++++++++++")
+    # Test Case 3 
+    # Depot in the middle shifted down a little 
+    travel_times = [[0, 4, 3, 3], [4, 0, 6, 6], [3, 6, 0, 0], [3, 6, 0, 0]]
+    data._set_travel_matrix(travel_times)
+    run(data)
+
+    print("++++++++++++++++++++++++++++++++++++++++++++++++++++++++++")
+    # Test Case 4
+    # Depot in the middle shifted down a little 
+    travel_times = [[0, 4, 3, 3], [4, 0, 6, 6], [3, 6.5, 0, 0], [3, 6.5, 0, 0]]
+    data._set_travel_matrix(travel_times)
+    run(data)
