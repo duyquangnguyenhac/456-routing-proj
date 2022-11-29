@@ -1,9 +1,8 @@
-from functools import partial
-from ortools.constraint_solver import routing_enums_pb2
-from ortools.constraint_solver import pywrapcp
 import os, json
 import pandas as pd
 import math
+import gurobipy as gp
+from gurobipy import GRB
 from collections import defaultdict
 
 def parse_demands():
@@ -53,44 +52,6 @@ def create_data_model():
     # 136x136 Matrix - Time travelled stored as Seconds
     _travel_times = json.load(open(os.path.abspath("./travel_times_matrix.json"), "r"))
 
+    #Demands
+    #Dict containing node i and n_th constraints representing times it in a month
     _demands = parse_demands()
-
-def manhattan_distance(position_1, position_2):
-    """Computes the Manhattan distance between two points"""
-    return (
-        abs(position_1[0] - position_2[0]) + abs(position_1[1] - position_2[1]))
-
-def create_distance_evaluator(data):
-    """Creates callback to return distance between points."""
-    _distances = {}
-    # precompute distance between location to have distance callback in O(1)
-    for from_node in range(data['num_locations']):
-        _distances[from_node] = {}
-        for to_node in range(data['num_locations']):
-            if from_node == to_node:
-                _distances[from_node][to_node] = 0
-            else:
-                _distances[from_node][to_node] = (manhattan_distance(
-                    data['locations'][from_node], data['locations'][to_node]))
-
-    def distance_evaluator(manager, from_node, to_node):
-        """Returns the manhattan distance between the two nodes"""
-        return _distances[manager.IndexToNode(from_node)][manager.IndexToNode(
-            to_node)]
-
-    return distance_evaluator
-
-def distance_evaluator(from_node, to_node):
-    return _distances[from_node][to_node]
-
-def create_demand_evaluator(data):
-    """Creates callback to get demands at each location."""
-    _demands = data['demands']
-
-    def demand_evaluator(manager, node):
-        """Returns the demand of the current node"""
-        return _demands[manager.IndexToNode(node)]
-
-    return demand_evaluator
-
-parse_demands()
