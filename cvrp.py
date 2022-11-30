@@ -97,18 +97,18 @@ def run(data):
         m.addConstr(x[i,i] == 0)
         for j in range(num_of_nodes):
             # If j references the same node, we shouldn't include this edge.
-            if i == j or (data._idx_to_ref[j] == i): 
+            if i == j or (data._idx_to_ref[j] == data._idx_to_ref[i]): 
                 continue
             cur_sum_enters += x[i, j]
         m.addConstr(cur_sum_enters == 1)
 
     for j in range(1, num_of_nodes):
-        cur_sum = 0
+        cur_sum_leaves = 0
         for i in range(num_of_nodes):
             # If j references the same node, we shouldn't include this edge.
-            if i == j or (data._idx_to_ref[j] == i): continue
-            cur_sum += x[i, j]
-        m.addConstr(cur_sum == 1)
+            if i == j or (data._idx_to_ref[j] == data._idx_to_ref[i]): continue
+            cur_sum_leaves += x[i, j]
+        m.addConstr(cur_sum_leaves == 1)
 
     for i in range(1, num_of_nodes):
         for j in range(1, num_of_nodes):
