@@ -5,11 +5,7 @@ import gurobipy as gp
 from gurobipy import GRB
 from collections import defaultdict
 
-_locations, _distances, _travel_times, _demands = None, None, None, None
-
 def parse_demands():
-    # demands are represented by dict where key is the ref number. the number of demands in the list
-    # represents how many times it needs to be delivered each month, and how many pallets in each turn.
     excel_data = pd.read_excel(r'FBWMLocationsDemands.xlsx')
     extra_nodes_idx = 137
     ref_to_nodes_idx = defaultdict(list)
@@ -22,7 +18,6 @@ def parse_demands():
         if type(freq) == float and math.isnan(freq):
             num_times = 1
         elif freq.lower() == "weekly":
-            # 4 times a month
             num_times = 4
         elif freq.lower() == "twice a month":
             num_times = 2
@@ -50,12 +45,11 @@ def parse_demands():
                 pallets_demands[extra_nodes_idx] = cur_demand
                 idx_to_ref[extra_nodes_idx] = idx
                 extra_nodes_idx += 1  
-        # ref_to_nodes_idx[ref] = nodes
     return pallets_demands, idx_to_ref
 
 class DataModel:
     def __init__(self):
-        # HOW TO load a json file as python object
+        # How load a json file as python object
         # variable_name = json.load(open("/path/to/your/file", "r"))
         self._locations = json.load(open(os.path.abspath("./locations.json"), "r"))
 
@@ -66,10 +60,11 @@ class DataModel:
         # 136x136 Matrix - Time travelled stored as Seconds
         self._travel_times = json.load(open(os.path.abspath("./travel_times_matrix.json"), "r"))
             
-        #Demands
-        #Dict containing node i and n_th constraints representing times it in a month
+        # Demands
+        # A list for demand of node at index i
         pallet_demands, idx_to_ref = parse_demands()
         self._demands = pallet_demands
+        # A dictionary to map idx to its ref_number. This will allow us to identify pseudo-nodes that were created to represent demands over a month.
         self._idx_to_ref = idx_to_ref
 
     def _set_travel_matrix(self, travel_time_matrix):
@@ -78,7 +73,8 @@ class DataModel:
 def run(data):
     # data = DataModel()
     m = gp.Model()
-    Q = 8
+    # Preset the truck's capacity to 9
+    Q = 9
 
     num_of_nodes = len(data._demands)
 
@@ -146,34 +142,5 @@ def run(data):
             print(v.varName, "=", v.x)
         
 if __name__ == "__main__":
-    # print("BEGIN TESTS =>")
-    # # Test Case 1
-    # data = DataModel()
-    # # Depot on the Side
-    # travel_times = [[0, 4, 7, 7], [4, 0, 3, 3], [7, 3, 0, 0], [7, 3, 0, 0]]
-    # data._set_travel_matrix(travel_times)
-    # run(data)
-
-    # print("++++++++++++++++++++++++++++++++++++++++++++++++++++++++++")
-    # # Test Case 2
-    # # Depot in the middle
-    # travel_times = [[0, 4, 3, 3], [4, 0, 7, 7], [3, 7, 0, 0], [3, 7, 0, 0]]
-    # data._set_travel_matrix(travel_times)
-    # run(data)
-
-    # print("++++++++++++++++++++++++++++++++++++++++++++++++++++++++++")
-    # # Test Case 3 
-    # # Depot in the middle shifted down a little 
-    # travel_times = [[0, 4, 3, 3], [4, 0, 6, 6], [3, 6, 0, 0], [3, 6, 0, 0]]
-    # data._set_travel_matrix(travel_times)
-    # run(data)
-
-    # print("++++++++++++++++++++++++++++++++++++++++++++++++++++++++++")
-    # # Test Case 4
-    # # Depot in the middle shifted down a little 
-    # travel_times = [[0, 4, 3, 3], [4, 0, 6, 6], [3, 6.5, 0, 0], [3, 6.5, 0, 0]]
-    # data._set_travel_matrix(travel_times)
-    # run(data)
-
     data = DataModel()
     run(data)
